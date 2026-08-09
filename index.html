@@ -1,4 +1,118 @@
-<!doctype html>
-<html>
-  <body></body>
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Viewer</title>
+  
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        min-height: 100%;
+        background: #f5f5f5;
+      }
+  
+      #viewer {
+        width: 100%;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 12px;
+        box-sizing: border-box;
+      }
+  
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        margin-bottom: 12px;
+        background: white;
+        box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+      }
+  
+      #error {
+        padding: 24px;
+        text-align: center;
+        font-family: sans-serif;
+        color: #555;
+      }
+    </style>
+  </head>
+  
+  <body>
+    <div id="viewer"></div>
+    <div id="error" hidden></div>
+  
+    <script type="module">
+      import * as pdfjsLib from
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
+  
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+  
+      const params = new URLSearchParams(window.location.search);
+      const file = params.get('file');
+  
+      const viewer = document.getElementById('viewer');
+      const error = document.getElementById('error');
+  
+      if (!file) {
+        showError('PDF 파일이 지정되지 않았습니다.');
+      } else {
+        loadPdf(`./pdf/${encodeURIComponent(file)}`);
+      }
+  
+      async function loadPdf(url) {
+        try {
+          const pdf = await pdfjsLib.getDocument(url).promise;
+  
+          for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+            const page = await pdf.getPage(pageNumber);
+  
+            const baseViewport = page.getViewport({ scale: 1 });
+  
+            const targetWidth = Math.min(
+              window.innerWidth - 24,
+              900
+            );
+  
+            const scale = targetWidth / baseViewport.width;
+            const viewport = page.getViewport({ scale });
+  
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+  
+            const outputScale = window.devicePixelRatio || 1;
+  
+            canvas.width = Math.floor(viewport.width * outputScale);
+            canvas.height = Math.floor(viewport.height * outputScale);
+  
+            canvas.style.width = `${viewport.width}px`;
+            canvas.style.height = `${viewport.height}px`;
+  
+            viewer.appendChild(canvas);
+  
+            await page.render({
+              canvasContext: context,
+              viewport,
+              transform:
+                outputScale !== 1
+                  ? [outputScale, 0, 0, outputScale, 0, 0]
+                  : null
+            }).promise;
+          }
+        } catch (e) {
+          console.error(e);
+          showError('PDF를 불러오지 못했습니다.');
+        }
+      }
+  
+      function showError(message) {
+        error.hidden = false;
+        error.textContent = message;
+      }
+    </script>
+  </body>
 </html>
